@@ -1,0 +1,16 @@
+<form>
+    <mat-form-field>
+      <mat-label>Yearly consumption</mat-label>
+      <input name="yearlyConsumption" matInput placeholder="Ex. 3500" [(ngModel)]="yearlyConsumption">
+      <span matTextSuffix>kWh</span>
+    </mat-form-field>
+    
+    <span class="calculate">
+        <a mat-button [routerLink]="[yearlyConsumption]">
+            <mat-icon>insert_chart_outlined</mat-icon>
+            Calculate
+        </a>
+    </span>
+</form>
+  
+<router-outlet></router-outlet>

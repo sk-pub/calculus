@@ -4,7 +4,9 @@ using Calculus.Api.Products;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
+// CORS
+builder.Services.AddCors();
+
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -41,5 +43,11 @@ app.MapPost("/electricity", (ElectricityCalculationParameters parameters) =>
 })
 .WithName("CalculateElectricity")
 .WithOpenApi();
+
+app.UseCors((cors) =>
+{
+    cors.AllowAnyOrigin();
+    cors.AllowAnyHeader();
+});
 
 app.Run();
