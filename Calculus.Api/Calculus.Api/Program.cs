@@ -1,8 +1,13 @@
 using Calculus.Api;
 using Calculus.Api.Calculators.Electricity;
-using Calculus.Api.Products;
+using Calculus.Api.Providers;
+using Microsoft.Extensions.Options;
+using Polly;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Config options
+builder.Services.Configure<ProviderOptions>(builder.Configuration.GetSection(nameof(ProviderOptions)));
 
 // CORS
 builder.Services.AddCors();
@@ -10,6 +15,25 @@ builder.Services.AddCors();
 // Swagger/OpenAPI
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+// External data source
+builder.Services.AddHttpClient<IDataProvider, ElectricityTariffProvider>(
+    (serviceProvider, client) =>
+    {
+        var providerOptions = serviceProvider.GetService<IOptionsMonitor<ProviderOptions>>();
+        if (providerOptions == null)
+        {
+            throw new Exception("No provider options found");
+        }
+        var apiUrl = providerOptions.CurrentValue.ElectricityTariffProviderUrl;
+        if (apiUrl == null)
+        {
+            throw new Exception($"Empty {nameof(ProviderOptions.ElectricityTariffProviderUrl)}");
+        }
+
+        client.BaseAddress = apiUrl;
+    })
+    .AddTransientHttpErrorPolicy(p => p.WaitAndRetryAsync(3, _ => TimeSpan.FromMilliseconds(100)));
 
 var app = builder.Build();
 
@@ -21,22 +45,11 @@ if (app.Environment.IsDevelopment())
 }
 
 // TODO: Generate endpoints for each calculator
-app.MapPost("/electricity", (ElectricityCalculationParameters parameters) =>
+app.MapPost("/electricity", async (ElectricityCalculationParameters parameters, IDataProvider dataProvider) =>
 {
     var calculator = new ElectricityCalculator();
 
-    // TODO: Get the json from an external provider
-    const string json = @"[
-{""name"": ""Product A"", ""type"": 1, ""baseCost"": 5, ""additionalKwhCost"": 22},
-{""name"": ""Product B"", ""type"": 2, ""includedKwh"": 4000, ""baseCost"": 800, ""additionalKwhCost"": 30}
-]";
-
-    // TODO: Get products from the json
-    IEnumerable<IProduct> products =
-    [
-        new BasicElectricity("Product A", 5, 22),
-        new PackagedElectricity("Product B", 4000, 800, 30)
-    ];
+    var products = await dataProvider.GetProducts();
 
     var results = CalculationResultList.Create(products, calculator, parameters);
     return results;
